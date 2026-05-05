@@ -16,7 +16,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5 # Updated to v5 to avoid Node.js deprecation warnings
         with:
-          go-version: '1.21'
+          go-version: '1.24'
 
       - name: Setup Sing-box
         # FIX: Replaced fragile 'grep/cut' with a robust 'jq' command to parse JSON
@@ -37,7 +37,7 @@ jobs:
 
       - name: Inject Custom Bundle Lists
         run: |
-          cat <<EOF > domain-list-community/data/my_direct
+          cat <<EOF > domain-list-community/data/my-direct
           include:apple-update
           include:windows-update
           include:icloud
@@ -58,7 +58,7 @@ jobs:
           include:gitlab
           EOF
           
-          cat <<EOF > domain-list-community/data/my_warp
+          cat <<EOF > domain-list-community/data/my-warp
           include:falungong
           include:category-porn
           EOF
@@ -66,7 +66,7 @@ jobs:
       - name: Build geosite.dat (For Shadowrocket)
         run: |
           cd domain-list-community
-          go run main.go --exportlists=my_direct,my_warp
+          go run main.go --exportlists=my-direct,my-warp
           mv dlc.dat ../geosite.dat
           cd ..
 
@@ -74,12 +74,12 @@ jobs:
         run: |
           # FIX: Ensure output directory exists before unpacking
           mkdir -p ./out
-          ~/go/bin/v2dat unpack geosite -o ./out -f my_direct,my_warp geosite.dat
+          ~/go/bin/v2dat unpack geosite -o ./out -f my-direct,my-warp geosite.dat
           
           python3 -c '
           import json
           
-          for name in ["my_direct", "my_warp"]:
+          for name in ["my-direct", "my-warp"]:
               with open(f"out/{name}.txt", "r") as f:
                   lines = f.read().splitlines()
               
@@ -96,8 +96,8 @@ jobs:
                   json.dump({"version": 1, "rules": [rules]}, f)
           '
           
-          sing-box rule-set compile my_direct.json -o my_direct.srs
-          sing-box rule-set compile my_warp.json -o my_warp.srs
+          sing-box rule-set compile my-direct.json -o my-direct.srs
+          sing-box rule-set compile my-warp.json -o my-warp.srs
 
       - name: Publish Release
         uses: softprops/action-gh-release@v2 # Updated to v2
@@ -105,5 +105,5 @@ jobs:
           tag_name: latest
           files: |
             geosite.dat
-            my_direct.srs
-            my_warp.srs
+            my-direct.srs
+            my-warp.srs
