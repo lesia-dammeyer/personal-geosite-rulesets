@@ -27,7 +27,7 @@ jobs:
           sudo mv sing-box-*/sing-box /usr/local/bin/
 
       - name: Setup v2dat
-        run: go install github.com/sxyazi/v2dat/cmd/v2dat@latest
+        run: go install github.com/urlesistiana/v2dat@latest
 
       - name: Checkout v2fly/domain-list-community
         uses: actions/checkout@v4
