@@ -70,30 +70,60 @@ jobs:
 
       - name: Generate sing-box Rule-sets (.srs)
         run: |
-          # FIX: Ensure output directory exists before unpacking
           mkdir -p ./out
-          ~/go/bin/v2dat unpack geosite -o ./out -f my-direct,my-warp geosite.dat
-          
-          python3 -c '
+
+          ~/go/bin/v2dat unpack geosite \
+            -d ./out \
+            -f my-direct \
+            -f my-warp \
+            geosite.dat
+
+          ls -lah ./out
+
+          python3 - <<'PY'
           import json
-          
-          for name in ["my-direct", "my-warp"]:
-              with open(f"out/{name}.txt", "r") as f:
-                  lines = f.read().splitlines()
-              
-              rules = {"domain": [], "domain_suffix": [], "domain_keyword": [], "domain_regex": []}
+          from pathlib import Path
+
+          mappings = {
+              "my-direct": "out/geosite_my-direct.txt",
+              "my-warp": "out/geosite_my-warp.txt",
+          }
+
+          for name, src in mappings.items():
+              src_path = Path(src)
+              if not src_path.exists():
+                  raise FileNotFoundError(f"Expected unpacked file not found: {src}")
+
+              lines = src_path.read_text().splitlines()
+
+              rules = {
+                  "domain": [],
+                  "domain_suffix": [],
+                  "domain_keyword": [],
+                  "domain_regex": [],
+              }
+
               for line in lines:
-                  if not line: continue
-                  if line.startswith("full:"): rules["domain"].append(line[5:])
-                  elif line.startswith("keyword:"): rules["domain_keyword"].append(line[8:])
-                  elif line.startswith("regexp:"): rules["domain_regex"].append(line[7:])
-                  else: rules["domain_suffix"].append(line)
-                  
+                  line = line.strip()
+                  if not line:
+                      continue
+
+                  if line.startswith("full:"):
+                      rules["domain"].append(line[5:])
+                  elif line.startswith("keyword:"):
+                      rules["domain_keyword"].append(line[8:])
+                  elif line.startswith("regexp:"):
+                      rules["domain_regex"].append(line[7:])
+                  else:
+                      rules["domain_suffix"].append(line)
+
               rules = {k: v for k, v in rules.items() if v}
-              with open(f"{name}.json", "w") as f:
-                  json.dump({"version": 1, "rules": [rules]}, f)
-          '
-          
+
+              Path(f"{name}.json").write_text(
+                  json.dumps({"version": 1, "rules": [rules]}, ensure_ascii=False)
+              )
+          PY
+
           sing-box rule-set compile my-direct.json -o my-direct.srs
           sing-box rule-set compile my-warp.json -o my-warp.srs
 
