@@ -1,0 +1,109 @@
+name: Build Custom Rulesets
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 22 * * *"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # CRITICAL FIX: The default GITHUB_TOKEN is read-only. 
+    # You need write permissions to publish a release.
+    permissions:
+      contents: write 
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v5 # Updated to v5 to avoid Node.js deprecation warnings
+        with:
+          go-version: '1.21'
+
+      - name: Setup Sing-box
+        # FIX: Replaced fragile 'grep/cut' with a robust 'jq' command to parse JSON
+        run: |
+          DOWNLOAD_URL=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | jq -r '.assets[] | select(.name | test("linux-amd64.tar.gz$")) | .browser_download_url' | head -n 1)
+          wget -qO sing-box.tar.gz "$DOWNLOAD_URL"
+          tar -xzf sing-box.tar.gz
+          sudo mv sing-box-*/sing-box /usr/local/bin/
+
+      - name: Setup v2dat
+        run: go install github.com/sxyazi/v2dat/cmd/v2dat@latest
+
+      - name: Checkout v2fly/domain-list-community
+        uses: actions/checkout@v4
+        with:
+          repository: v2fly/domain-list-community
+          path: domain-list-community
+
+      - name: Inject Custom Bundle Lists
+        run: |
+          cat <<EOF > domain-list-community/data/my_direct
+          include:apple-update
+          include:windows-update
+          include:icloud
+          include:speedtest
+          include:ookla
+          include:youtube
+          include:twitch
+          include:vimeo
+          include:category-games
+          include:google-play
+          include:category-web-archive
+          include:google-drive
+          include:onedrive
+          include:dropbox
+          include:mega
+          include:github
+          include:docker
+          include:gitlab
+          EOF
+          
+          cat <<EOF > domain-list-community/data/my_warp
+          include:falungong
+          include:category-porn
+          EOF
+
+      - name: Build geosite.dat (For Shadowrocket)
+        run: |
+          cd domain-list-community
+          go run main.go --exportlists=my_direct,my_warp
+          mv dlc.dat ../geosite.dat
+          cd ..
+
+      - name: Generate sing-box Rule-sets (.srs)
+        run: |
+          # FIX: Ensure output directory exists before unpacking
+          mkdir -p ./out
+          ~/go/bin/v2dat unpack geosite -o ./out -f my_direct,my_warp geosite.dat
+          
+          python3 -c '
+          import json
+          
+          for name in ["my_direct", "my_warp"]:
+              with open(f"out/{name}.txt", "r") as f:
+                  lines = f.read().splitlines()
+              
+              rules = {"domain": [], "domain_suffix": [], "domain_keyword": [], "domain_regex": []}
+              for line in lines:
+                  if not line: continue
+                  if line.startswith("full:"): rules["domain"].append(line[5:])
+                  elif line.startswith("keyword:"): rules["domain_keyword"].append(line[8:])
+                  elif line.startswith("regexp:"): rules["domain_regex"].append(line[7:])
+                  else: rules["domain_suffix"].append(line)
+                  
+              rules = {k: v for k, v in rules.items() if v}
+              with open(f"{name}.json", "w") as f:
+                  json.dump({"version": 1, "rules": [rules]}, f)
+          '
+          
+          sing-box rule-set compile my_direct.json -o my_direct.srs
+          sing-box rule-set compile my_warp.json -o my_warp.srs
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2 # Updated to v2
+        with:
+          tag_name: latest
+          files: |
+            geosite.dat
+            my_direct.srs
+            my_warp.srs
