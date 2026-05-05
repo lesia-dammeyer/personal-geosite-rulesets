@@ -42,7 +42,6 @@ jobs:
           include:microsoft
           include:icloud
           include:speedtest
-          include:ookla
           include:youtube
           include:twitch
           include:vimeo
