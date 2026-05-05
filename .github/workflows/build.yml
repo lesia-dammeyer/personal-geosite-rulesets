@@ -39,7 +39,7 @@ jobs:
         run: |
           cat <<EOF > domain-list-community/data/my-direct
           include:apple-update
-          include:windows-update
+          include:microsoft-dev
           include:icloud
           include:speedtest
           include:ookla
