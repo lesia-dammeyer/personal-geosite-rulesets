@@ -53,6 +53,7 @@ jobs:
           include:mega
           include:github
           include:docker
+          include:duckduckgo
           include:gitlab
           EOF
           
