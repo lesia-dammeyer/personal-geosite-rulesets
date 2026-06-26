@@ -48,6 +48,7 @@ jobs:
           include:category-games
           include:google-play
           include:category-web-archive
+          include:internet-archive
           include:onedrive
           include:dropbox
           include:mega
